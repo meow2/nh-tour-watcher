@@ -11,7 +11,8 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 # 設定
-BASE_URL = "https://ana-blue-hangar-tour.resv.jp/reserve/calendar.php?x=....." # ★URLはそのまま使ってください
+# ★URLはカレンダーが表示される正しいものを維持してください
+BASE_URL = "https://ana-blue-hangar-tour.resv.jp/reserve/calendar.php?x=....." 
 NOTIFIED_FILE = "notified_dates.txt"
 
 # LINE Messaging API 設定
@@ -74,61 +75,57 @@ def check_availability():
         text_all = cell.get_text(strip=True)
         if not text_all: continue
 
+        # 全角数字などを正規化
         text_norm = unicodedata.normalize('NFKC', text_all)
         
-        # --- 判定ロジック ---
-        is_avail = False
-        seat_info = ""
-
-        # 1. 記号判定
-        if "○" in text_norm or "◎" in text_norm:
-            is_avail = True
-            seat_info = "余裕あり(○)"
-        elif "△" in text_norm:
-            is_avail = True
-            seat_info = "残りわずか(△)"
+        # 1. まず日付を特定する（セルの先頭の数字）
+        day_match = re.match(r'^(\d+)', text_norm)
+        if not day_match:
+            continue # 日付がないセルは無視
         
-        # 2. 「残数」判定 (修正箇所)
-        # 修正前: re.search(r'残(\d+)', text_norm) -> 時間の数字まで吸い込んでいた
-        # 修正後: re.search(r'残(\d+)(?=\d{1,2}:\d{2})', text_norm)
-        # 解説: 「後ろに『数字:数字』(時間)が控えている直前までの数字」だけを抜き取る
+        day_str = day_match.group(1)
+
+        # 2. セル内の「すべての」空きパターンを探す
+        # パターン: 「残」+「席数」+「時間」
+        # 例: 残19:30 -> 席数1, 時間9:30
+        # 例: 残1010:00 -> 席数10, 時間10:00
         
-        if not is_avail:
-            # 時間(9:30など)の前にある数字だけを取得する
-            match_zan = re.search(r'残(\d+)(?=\d{1,2}:\d{2})', text_norm)
+        # 正規表現の説明:
+        # 残        : "残"という文字
+        # (\d+)     : 席数 (グループ1)
+        # (\d{1,2}:\d{2}) : 時間 (グループ2)
+        # 以前の問題「残19:30」を「19席」と読まないよう、時間の直前で区切る
+        
+        iterator = re.finditer(r'残(\d+)(\d{1,2}:\d{2})', text_norm)
+        
+        for match in iterator:
+            seats = int(match.group(1))
+            time_str = match.group(2)
             
-            # もし時間のパターンがない場合（単に「残1」で終わっている場合など）の予備チェック
-            if not match_zan:
-                 # 時間チェックなしで数字を取るが、桁数制限（1〜2桁）をかけて誤検知を防ぐ
-                 match_zan = re.search(r'残(\d{1,2})', text_norm)
+            # デバッグ用: 何を見つけたか表示
+            # print(f"  [Check] {day_str}日 {time_str} -> 残{seats}")
 
-            if match_zan:
-                seats = int(match_zan.group(1))
-                if seats >= 1: # 1席以上あればヒット
-                    is_avail = True
-                    seat_info = f"残り{seats}席"
+            # 3. 判定: 席数が1以上か？
+            if seats >= 1:
+                # 4. 「○」や「△」などの記号も近くにあるか確認（念のため）
+                #    なくても「残1」以上なら通知する設定にします（画像で残数が確実なので）
+                
+                status_emoji = "△" if seats <= 5 else "○"
+                
+                display_text = f"【{day_str}日 {time_str}】 {status_emoji} 残り{seats}席"
+                print(f"  -> MATCH! Found: {display_text}")
 
-        if is_avail:
-            # 日付を取得
-            day_match = re.match(r'^(\d+)', text_norm)
-            day_str = f"{day_match.group(1)}日" if day_match else "日付不明"
-            
-            # 表示用テキスト
-            display_text = f"【{day_str}】 {seat_info}"
-            print(f"  -> MATCH! Found: {display_text} (原盤: {text_norm[:15]}...)")
-            
-            # 通知ロジック
-            today = datetime.now().strftime("%Y-%m-%d")
-            # 席数や日付が変わっても通知されるように、キーには席数情報を含める
-            unique_key = f"{today}: {day_str} {seat_info}"
-            
-            # まだ今日通知していない内容なら追加
-            if not any(unique_key in s for s in notified_slots if s.startswith(today)):
-                found_slots.append(display_text)
-                new_notified_slots.append(unique_key)
+                # 今日の日付 + ツアー日時 + 席数 をキーにして重複通知を防ぐ
+                today = datetime.now().strftime("%Y-%m-%d")
+                unique_key = f"{today}: {day_str} {time_str} {seats}"
+                
+                if not any(unique_key in s for s in notified_slots if s.startswith(today)):
+                    found_slots.append(display_text)
+                    new_notified_slots.append(unique_key)
 
     if found_slots:
         print(f"Found {len(found_slots)} slots.")
+        # 通知メッセージ作成
         msg = "✈️ ANA工場見学 空き発生！\n\n" + "\n".join(found_slots) + f"\n\n予約: {BASE_URL}"
         send_line_message(msg)
         
