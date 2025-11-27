@@ -94,7 +94,11 @@ def check_availability():
                 if not any(unique_key in s for s in notified_slots if s.startswith(today)):
                     found_slots.append(clean_text)
                     new_notified_slots.append(unique_key)
-
+    
+    # ▼▼▼【ここに追加】テスト用：強制的にリストに文字を入れる ▼▼▼
+    found_slots.append("【テスト】この通知が届けば、システムは正常に稼働しています！")
+    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    
     if found_slots:
         print(f"Found: {len(found_slots)}")
         msg = "✈️ ANA工場見学 空きあり(2席以上)\n\n" + "\n".join(found_slots) + f"\n\n予約: {BASE_URL}"
