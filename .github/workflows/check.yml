@@ -12,18 +12,29 @@ jobs:
       contents: write 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+
       - run: pip install -r requirements.txt
+
       - name: Run
         env:
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python main.py
+
       - name: Save History
         run: |
           git config --global user.name 'Action'
           git config --global user.email 'action@github.com'
-          git add notified_dates.txt
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update" && git push)
+          
+          # ファイルが存在する場合のみ保存処理を行う
+          if [ -f notified_dates.txt ]; then
+            git add notified_dates.txt
+            # 変更がある場合のみコミット
+            git diff --quiet && git diff --staged --quiet || (git commit -m "Update" && git push)
+          else
+            echo "まだ通知履歴ファイルがないため、保存をスキップします。"
+          fi
