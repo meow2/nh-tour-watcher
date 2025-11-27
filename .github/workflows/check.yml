@@ -2,7 +2,7 @@ name: ANA Watcher
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # 15分ごとに実行
+    - cron: '*/5 * * * *'  # 5分ごとに実行
   workflow_dispatch:        # 手動実行ボタン
 
 jobs:
