@@ -12,7 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
 # 設定
-BASE_URL = "https://ana-blue-hangar-tour.resv.jp/reserve/calendar.php?x=....." # ★URLはそのまま
+BASE_URL = "https://ana-blue-hangar-tour.resv.jp/reserve/calendar.php" # ★URLはそのまま
 NOTIFIED_FILE = "notified_dates.txt"
 TARGET_TIMES = ["9:30", "10:45", "13:00", "14:15", "15:30"]
 WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"]
